@@ -65,7 +65,10 @@ export class StoryViewModel {
   }
 
   selectScene(sceneId: string): void {
-    this.updateStory((story) => ({ ...story, selectedSceneId: sceneId }));
+    // 纯浏览：只更新内存中的选中项，不进入编辑中，也不触发保存
+    const story = this.requireStory();
+    if (story.selectedSceneId === sceneId) return;
+    this.setState({ story: { ...story, selectedSceneId: sceneId } });
   }
 
   addCharacter(name: string, role: string): void {
@@ -109,7 +112,7 @@ export class StoryViewModel {
     this.updateStory((story) => ({
       ...story,
       scenes: story.scenes.map((scene) => (scene.id === sceneId ? { ...scene, ...patch } : scene)),
-    }), false);
+    }));
   }
 
   toggleCharacter(sceneId: string, characterId: string): void {
@@ -190,10 +193,11 @@ export class StoryViewModel {
     return this.state.story;
   }
 
-  private updateStory(updater: (story: StoryDocument) => StoryDocument, showEditing = true): void {
+  private updateStory(updater: (story: StoryDocument) => StoryDocument): void {
+    // 所有编辑入口共用同一套规则：改内容才进入编辑中，并保存一次
     const story = updater(this.requireStory());
     this.persist(story);
-    this.setState({ story, stats: getStats(story), status: showEditing ? 'editing' : this.state.status, error: '' });
+    this.setState({ story, stats: getStats(story), status: 'editing', error: '' });
   }
 
   private persist(story: StoryDocument): void {
