@@ -65,7 +65,8 @@ export class StoryViewModel {
   }
 
   selectScene(sceneId: string): void {
-    this.updateStory((story) => ({ ...story, selectedSceneId: sceneId }));
+    // 纯浏览：只切换当前查看的场景，不保存、不改变完成状态。
+    this.updateStory((story) => ({ ...story, selectedSceneId: sceneId }), { persist: false, markEditing: false });
   }
 
   addCharacter(name: string, role: string): void {
@@ -106,10 +107,11 @@ export class StoryViewModel {
   }
 
   updateScene(sceneId: string, patch: Partial<Pick<StoryScene, 'title' | 'summary' | 'conflict'>>): void {
+    // 改内容：进入编辑中并保存。
     this.updateStory((story) => ({
       ...story,
       scenes: story.scenes.map((scene) => (scene.id === sceneId ? { ...scene, ...patch } : scene)),
-    }), false);
+    }));
   }
 
   toggleCharacter(sceneId: string, characterId: string): void {
@@ -185,15 +187,37 @@ export class StoryViewModel {
     return story ? getTimelineWarning(story) : null;
   }
 
+  get editState(): { label: string; tone: 'draft' | 'editing' | 'complete' | 'error' } {
+    switch (this.state.status) {
+      case 'completed':
+        return { label: '已完成', tone: 'complete' };
+      case 'editing':
+        return { label: '编辑中', tone: 'editing' };
+      case 'error':
+        return { label: '保存失败', tone: 'error' };
+      default:
+        return { label: '草稿', tone: 'draft' };
+    }
+  }
+
   private requireStory(): StoryDocument {
     if (!this.state.story) throw new Error('故事尚未初始化');
     return this.state.story;
   }
 
-  private updateStory(updater: (story: StoryDocument) => StoryDocument, showEditing = true): void {
+  /**
+   * 应用一次文档变更。
+   * - persist：是否写入本地存储。纯浏览（如切换选中场景）不应保存。
+   * - markEditing：是否把状态置为「编辑中」。只有真正改内容才应进入编辑中。
+   */
+  private updateStory(
+    updater: (story: StoryDocument) => StoryDocument,
+    options: { persist?: boolean; markEditing?: boolean } = {},
+  ): void {
+    const { persist = true, markEditing = true } = options;
     const story = updater(this.requireStory());
-    this.persist(story);
-    this.setState({ story, stats: getStats(story), status: showEditing ? 'editing' : this.state.status, error: '' });
+    if (persist) this.persist(story);
+    this.setState({ story, stats: getStats(story), status: markEditing ? 'editing' : this.state.status, error: '' });
   }
 
   private persist(story: StoryDocument): void {

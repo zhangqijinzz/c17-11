@@ -33,4 +33,23 @@ describe('story view model', () => {
     viewModel.resetProject();
     expect(viewModel.snapshot.story?.id).toBe(createStarterStory().id);
   });
+
+  it('keeps completion status and does not persist when merely browsing scenes', () => {
+    const storage = new MemoryStorageService();
+    const viewModel = new StoryViewModel(new LocalStoryRepository(storage));
+    viewModel.initialize();
+    viewModel.completeProject();
+    expect(viewModel.snapshot.status).toBe('completed');
+    const savedAfterComplete = storage.read();
+
+    // 点开任意一幕看详情：属于纯浏览，状态不变、不产生保存。
+    viewModel.selectScene('scene-storm');
+    expect(viewModel.snapshot.status).toBe('completed');
+    expect(storage.read()).toBe(savedAfterComplete);
+
+    // 真正改内容：回到编辑中，并产生一次保存。
+    viewModel.updateScene('scene-storm', { title: '灯塔停电' });
+    expect(viewModel.snapshot.status).toBe('editing');
+    expect(storage.read()).not.toBe(savedAfterComplete);
+  });
 });
